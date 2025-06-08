@@ -1,12 +1,3 @@
-/// # DeFi Scaffold - DEX Tests
-/// 
-/// Comprehensive test suite for the DEX functionality.
-/// This test module covers all major functionality including:
-/// - Pair creation
-/// - Liquidity management
-/// - Token swapping
-/// - Fee collection
-/// - Edge cases and error conditions
 #[test_only]
 module defi_scaffold::dex_tests {
     use sui::test_scenario::{Self, Scenario};
@@ -19,8 +10,8 @@ module defi_scaffold::dex_tests {
     // Test Constants
     // ================================
     
-    const ADMIN_ADDRESS: address = @0xAD;
-    const USER_ADDRESS: address = @0xUSER;
+    const ADMIN_ADDRESS: address = @0x0;
+    const USER_ADDRESS: address = @0x1;
     const INITIAL_BALANCE: u64 = 1_000_000_000; // 1B tokens
     const DEFAULT_FEE_BPS: u64 = 300; // 3%
     
@@ -158,59 +149,6 @@ module defi_scaffold::dex_tests {
         test_scenario::end(scenario);
     }
 
-    #[test]
-    fun test_multi_hop_swap() {
-        let mut scenario = setup_test();
-        setup_pair<TokenA, TokenB>(&mut scenario, 1000, 2000);
-        setup_pair<TokenB, TokenC>(&mut scenario, 2000, 3000);
-        
-        // TODO: Execute A -> B -> C swap
-        // TODO: Verify each hop works correctly
-        // TODO: Check total fees and slippage
-        // TODO: Verify final output amount
-        
-        test_scenario::end(scenario);
-    }
-
-    // ================================
-    // Edge Case Tests
-    // ================================
-
-    #[test]
-    fun test_large_swap_impact() {
-        let mut scenario = setup_test();
-        setup_pair<TokenA, TokenB>(&mut scenario, 1000, 1000);
-        
-        // TODO: Execute very large swap
-        // TODO: Verify price impact calculation
-        // TODO: Check reserves don't become zero
-        // TODO: Verify constant product holds
-        
-        test_scenario::end(scenario);
-    }
-
-    #[test]
-    fun test_minimum_liquidity() {
-        let mut scenario = setup_test();
-        
-        // TODO: Try creating pair with very small amounts
-        // TODO: Verify minimum liquidity requirements
-        // TODO: Check precision handling
-        
-        test_scenario::end(scenario);
-    }
-
-    #[test]
-    fun test_zero_amount_operations() {
-        let mut scenario = setup_test();
-        setup_pair<TokenA, TokenB>(&mut scenario, 1000, 2000);
-        
-        // TODO: Test operations with zero amounts
-        // TODO: Verify proper error handling
-        // TODO: Check no state changes occur
-        
-        test_scenario::end(scenario);
-    }
 
     // ================================
     // Error Condition Tests
@@ -305,22 +243,6 @@ module defi_scaffold::dex_tests {
     }
 
     // ================================
-    // Performance Tests
-    // ================================
-
-    #[test]
-    fun test_gas_efficiency() {
-        let mut scenario = setup_test();
-        setup_pair<TokenA, TokenB>(&mut scenario, 10000, 20000);
-        
-        // TODO: Execute standard operations
-        // TODO: Measure gas consumption
-        // TODO: Verify operations are efficient
-        
-        test_scenario::end(scenario);
-    }
-
-    // ================================
     // Math Verification Tests
     // ================================
 
@@ -347,31 +269,5 @@ module defi_scaffold::dex_tests {
         // TODO: Check rounding behavior
         
         test_scenario::end(scenario);
-    }
-
-    // ================================
-    // Helper Functions for Tests
-    // ================================
-
-    /// Verifies that two values are approximately equal (for precision tests)
-    fun assert_approx_equal(actual: u64, expected: u64, tolerance: u64) {
-        let diff = if (actual > expected) {
-            actual - expected
-        } else {
-            expected - actual
-        };
-        assert!(diff <= tolerance, 0);
-    }
-
-    /// Gets the balance of a specific token for a user
-    fun get_user_balance<T>(scenario: &Scenario, user: address): u64 {
-        // TODO: Retrieve user's coin balance
-        0
-    }
-
-    /// Calculates expected LP tokens for liquidity provision
-    fun calculate_expected_lp(amount_a: u64, amount_b: u64, total_lp: u64, reserve_a: u64, reserve_b: u64): u64 {
-        // TODO: Implement LP token calculation formula
-        0
     }
 } 
