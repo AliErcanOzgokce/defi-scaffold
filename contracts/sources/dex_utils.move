@@ -13,7 +13,6 @@ module defi_scaffold::dex_utils {
     // ================================
 
     /// Creates a pair and transfers LP tokens to sender
-    #[allow(lint(self_transfer))]
     public fun create_pair_and_transfer<TokenA, TokenB>(
         registry: &mut PairRegistry,
         token_a: Coin<TokenA>,
