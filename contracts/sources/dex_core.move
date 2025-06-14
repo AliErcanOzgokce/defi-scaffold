@@ -180,7 +180,7 @@ public fun create_pair<TokenA, TokenB>(
         pair_id: object::id(&pair),
         token_a,
         token_b,
-        creator: tx_context::sender(ctx),
+        creator: ctx.sender(),
     });
 
     // Share pair object and return liquidity tokens
@@ -248,7 +248,7 @@ public fun add_liquidity<TokenA, TokenB>(
     // Emit event
     event::emit(LiquidityAdded {
         pair_id: object::id(pair),
-        provider: tx_context::sender(ctx),
+        provider: ctx.sender(),
         amount_a: deposit_a,
         amount_b: deposit_b,
         liquidity_minted: lp_to_mint,
@@ -361,7 +361,7 @@ public fun swap_a_to_b<TokenA, TokenB>(
     // Emit swap event
     event::emit(SwapExecuted {
         pair_id: object::id(pair),
-        trader: tx_context::sender(ctx),
+        trader: ctx.sender(),
         token_in: type_name::get<TokenA>(),
         token_out: type_name::get<TokenB>(),
         amount_in: input_amount,
@@ -424,7 +424,7 @@ public fun swap_b_to_a<TokenA, TokenB>(
     // Emit swap event
     event::emit(SwapExecuted {
         pair_id: object::id(pair),
-        trader: tx_context::sender(ctx),
+        trader: ctx.sender(),
         token_in: type_name::get<TokenB>(),
         token_out: type_name::get<TokenA>(),
         amount_in: input_amount,
@@ -462,18 +462,18 @@ public fun collect_fees<TokenA, TokenB>(
     ctx: &mut TxContext,
 ): (Coin<TokenA>, Coin<TokenB>) {
     // Extract collected fees
-    let fee_a_amount = balance::value(&pair.collected_fees_a);
-    let fee_b_amount = balance::value(&pair.collected_fees_b);
+    let fee_a_amount = pair.collected_fees_a.value();
+    let fee_b_amount = pair.collected_fees_b.value();
 
     // Create coins from collected fees
     let coin_a = if (fee_a_amount > 0) {
-        coin::from_balance(balance::withdraw_all(&mut pair.collected_fees_a), ctx)
+        coin::from_balance(pair.collected_fees_a.withdraw_all(), ctx)
     } else {
         coin::zero<TokenA>(ctx)
     };
 
     let coin_b = if (fee_b_amount > 0) {
-        coin::from_balance(balance::withdraw_all(&mut pair.collected_fees_b), ctx)
+        coin::from_balance(pair.collected_fees_b.withdraw_all(), ctx)
     } else {
         coin::zero<TokenB>(ctx)
     };
@@ -507,6 +507,7 @@ public fun init_for_testing(ctx: &mut TxContext) {
 // ================================
 
 /// Gets the current reserves of a trading pair
+#[test_only]
 public fun get_reserves<TokenA, TokenB>(
     pair: &TradingPair<TokenA, TokenB>
 ): (u64, u64) {
@@ -514,6 +515,7 @@ public fun get_reserves<TokenA, TokenB>(
 }
 
 /// Gets the current liquidity supply
+#[test_only]
 public fun get_liquidity_supply<TokenA, TokenB>(
     pair: &TradingPair<TokenA, TokenB>
 ): u64 {
@@ -521,6 +523,7 @@ public fun get_liquidity_supply<TokenA, TokenB>(
 }
 
 /// Gets current fee rates
+#[test_only]
 public fun get_fee_rates<TokenA, TokenB>(
     pair: &TradingPair<TokenA, TokenB>
 ): (u64, u64) {
@@ -528,6 +531,7 @@ public fun get_fee_rates<TokenA, TokenB>(
 }
 
 /// Checks if a pair exists in the registry
+#[test_only]
 public fun pair_exists<TokenA, TokenB>(
     registry: &PairRegistry
 ): bool {
@@ -538,6 +542,7 @@ public fun pair_exists<TokenA, TokenB>(
 }
 
 /// Calculates expected output for a given input
+#[test_only]
 public fun get_amount_out<TokenA, TokenB>(
     pair: &TradingPair<TokenA, TokenB>,
     amount_in: u64,
