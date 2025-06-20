@@ -1,278 +1,312 @@
-# 🏗️ DeFi Scaffold - Complete DEX Solution
+# DeFi Scaffold - Automated Market Maker (AMM) on Sui Move
 
-A clean, minimal, and well-organized Automated Market Maker (AMM) implementation for the Sui blockchain. This project provides both smart contracts and a TypeScript SDK for building decentralized exchanges.
+This repository contains a comprehensive implementation of an Automated Market Maker (AMM) DEX built on Sui Move. The project demonstrates core DeFi primitives including liquidity pools, token swaps, and fee collection mechanisms.
 
-## 🌟 Features
+## Architecture Overview
 
-### Smart Contracts
-- **Simple & Clean Architecture** - Well-organized, readable code structure
-- **Minimal Design** - Only essential features, no bloat
-- **Type Safety** - Full Move language type safety
-- **Comprehensive Testing** - Extensive test coverage for all functionality
-- **Gas Optimized** - Efficient operations to minimize transaction costs
+The DeFi Scaffold implements a Uniswap V2-like AMM with the following core components:
 
-### Core Functionality
-- ✅ Create trading pairs between any two tokens
-- ✅ Add/remove liquidity with automatic optimal ratios
-- ✅ Token swapping with slippage protection
-- ✅ Multi-hop routing for indirect token pairs
-- ✅ Fee collection and protocol revenue
-- ✅ Admin controls for fee management
+![Class Diagram](1.png)
 
-### TypeScript SDK
-- 🔧 **Easy Integration** - Simple API for frontend applications
-- 📊 **Rich Querying** - Get quotes, pair info, and route optimization
-- 🛡️ **Type Safe** - Full TypeScript support with proper types
-- 🚀 **Production Ready** - Handles errors, retries, and edge cases
-- 📖 **Well Documented** - Comprehensive examples and documentation
+### Core Components
 
-## 📁 Project Structure
+1. **TradingPair**: The central object representing a liquidity pool for a pair of tokens
+2. **PairRegistry**: Maintains a registry of all trading pairs
+3. **LiquidityToken**: Represents ownership shares in a trading pair
+4. **AdminCap**: Capability object for administrative functions
+
+## Core Modules
+
+### dex_core.move
+
+The main module implementing the DEX functionality:
 
 ```
-defi-scaffold/
-├── contracts/                  # Move smart contracts
-│   ├── sources/
-│   │   ├── dex_core.move      # Core AMM logic
-│   │   └── dex_utils.move     # SDK utility functions
-│   ├── tests/
-│   │   └── dex_tests.move     # Comprehensive test suite
-│   └── Move.toml              # Move package configuration
-├── scripts/                   # TypeScript SDK and tools
-│   ├── dex-sdk.ts            # Main SDK implementation
-│   ├── examples/
-│   │   └── dex-examples.ts   # Usage examples
-│   └── helpers/              # Utility functions
-└── README.md                 # This file
+module defi_scaffold::dex_core;
 ```
 
-## 🚀 Quick Start
+This module contains the core trading pair implementation, pair registry, and all trading functions.
 
-### Prerequisites
+### dex_helper.move
 
-- [Sui CLI](https://docs.sui.io/build/install) installed
-- [Node.js](https://nodejs.org/) v18+ installed
-- Basic understanding of Move and TypeScript
+Contains mathematical helper functions for the DEX:
 
-### Installation
-
-1. **Clone the repository**
-```bash
-git clone <repository-url>
-cd defi-scaffold
+```
+module defi_scaffold::dex_helper;
 ```
 
-2. **Install dependencies**
-```bash
-npm install
+This module implements the constant product formula calculations, fee calculations, and other mathematical operations.
+
+## Key Data Structures
+
+### TradingPair
+
+```move
+public struct TradingPair<phantom TokenA, phantom TokenB> has key {
+    id: UID,
+    reserve_a: Balance<TokenA>,
+    reserve_b: Balance<TokenB>,
+    liquidity_supply: Supply<LiquidityToken<TokenA, TokenB>>,
+    fee_rate_bps: u64,
+    protocol_fee_bps: u64,
+    collected_fees_a: Balance<TokenA>,
+    collected_fees_b: Balance<TokenB>,
+}
 ```
 
-3. **Build smart contracts**
-```bash
-cd contracts
-sui move build
+- `reserve_a` and `reserve_b`: Token reserves for the trading pair
+- `liquidity_supply`: Supply of liquidity tokens
+- `fee_rate_bps`: Trading fee rate in basis points (1/100 of 1%)
+- `protocol_fee_bps`: Percentage of trading fees allocated to protocol
+
+### PairRegistry
+
+```move
+public struct PairRegistry has key {
+    id: UID,
+    pairs: Table<PairKey, ID>,
+}
 ```
 
-4. **Run tests**
-```bash
-sui move test
+- `pairs`: Table mapping token pair keys to trading pair IDs
+
+### LiquidityToken
+
+```move
+public struct LiquidityToken<phantom TokenA, phantom TokenB> has drop {}
 ```
 
-### Deploy to Testnet
+- Represents ownership share in a trading pair
+- Phantom type parameters ensure type safety
 
-1. **Deploy contracts**
-```bash
-sui client publish --gas-budget 20000000
+## Core Functionality Flow
+
+![Flow Diagram](2.png)
+
+## Core Operations
+
+### Pair Creation
+
+```move
+public fun create_pair<TokenA, TokenB>(
+    registry: &mut PairRegistry,
+    initial_a: Coin<TokenA>,
+    initial_b: Coin<TokenB>,
+    fee_rate_bps: u64,
+    ctx: &mut TxContext,
+): Coin<LiquidityToken<TokenA, TokenB>>
 ```
 
-2. **Update SDK configuration**
-```typescript
-const DEX_CONFIG = {
-  packageId: "0x...", // Your deployed package ID
-  registryId: "0x...", // Registry object ID from deployment
-  adminCapId: "0x...", // Admin capability ID
-};
+1. Validates token order (A != B)
+2. Ensures pair doesn't already exist
+3. Validates fee rate is within limits
+4. Creates trading pair with initial liquidity
+5. Registers pair in registry
+6. Returns initial liquidity tokens
+
+### Adding Liquidity
+
+```move
+public fun add_liquidity<TokenA, TokenB>(
+    pair: &mut TradingPair<TokenA, TokenB>,
+    token_a: Coin<TokenA>,
+    token_b: Coin<TokenB>,
+    min_liquidity: u64,
+    ctx: &mut TxContext,
+): (Coin<TokenA>, Coin<TokenB>, Coin<LiquidityToken<TokenA, TokenB>>)
 ```
 
-## 💡 Usage Examples
+1. Calculates optimal deposit amounts based on current ratio
+2. Adds tokens to reserves
+3. Calculates and mints liquidity tokens
+4. Returns unused tokens and new liquidity tokens
+
+### Removing Liquidity
+
+```move
+public fun remove_liquidity<TokenA, TokenB>(
+    pair: &mut TradingPair<TokenA, TokenB>,
+    liquidity_tokens: Coin<LiquidityToken<TokenA, TokenB>>,
+    min_amount_a: u64,
+    min_amount_b: u64,
+    ctx: &mut TxContext,
+): (Coin<TokenA>, Coin<TokenB>)
+```
+
+1. Burns liquidity tokens
+2. Calculates withdrawal amounts proportionally
+3. Withdraws tokens from reserves
+4. Returns tokens to user
+
+### Token Swapping
+
+```move
+public fun swap_a_to_b<TokenA, TokenB>(
+    pair: &mut TradingPair<TokenA, TokenB>,
+    token_a: Coin<TokenA>,
+    min_amount_out: u64,
+    ctx: &mut TxContext,
+): Coin<TokenB>
+```
+
+1. Calculates output amount using constant product formula
+2. Applies trading fee
+3. Splits fee between protocol and liquidity providers
+4. Updates reserves
+5. Returns output tokens
+
+### Fee Collection
+
+```move
+public fun collect_fees<TokenA, TokenB>(
+    pair: &mut TradingPair<TokenA, TokenB>,
+    _: &AdminCap,
+    ctx: &mut TxContext,
+): (Coin<TokenA>, Coin<TokenB>)
+```
+
+1. Extracts accumulated protocol fees
+2. Returns fee tokens to admin
+
+## Mathematical Models
+
+![Math Models](3.png)
+
+
+### Constant Product Formula
+
+The AMM uses the constant product formula: `x * y = k`
+
+For swaps, this means:
+```
+(reserve_a + amount_in * (1 - fee)) * reserve_b = k
+```
+
+Output amount is calculated as:
+```
+amount_out = reserve_b - (k / (reserve_a + amount_in * (1 - fee)))
+```
+
+### Liquidity Calculations
+
+Initial liquidity is calculated as:
+```
+initial_liquidity = sqrt(amount_a * amount_b)
+```
+
+For subsequent deposits:
+```
+liquidity_minted = min(
+    (amount_a * total_liquidity) / reserve_a,
+    (amount_b * total_liquidity) / reserve_b
+)
+```
+
+## Error Handling
+
+The contract defines several error codes to handle invalid operations:
+
+- `EInsufficientInput`: Input amount is too small
+- `ESlippageExceeded`: Output amount is below minimum threshold
+- `EInvalidFee`: Fee rate is outside allowed range
+- `EPairExists`: Pair already exists in registry
+- `EInsufficientLiquidity`: Not enough liquidity in pool
+- `EInvalidTokenOrder`: Token types must be different
+- `EZeroAmount`: Amount cannot be zero
+
+## Events
+
+The contract emits events for key operations:
+
+- `PairCreated`: When a new trading pair is created
+- `LiquidityAdded`: When liquidity is added to a pair
+- `LiquidityRemoved`: When liquidity is removed from a pair
+- `SwapExecuted`: When a token swap is executed
+
+## Security Considerations
+
+1. **Slippage Protection**: Users can specify minimum output amounts to protect against front-running
+2. **Fee Mechanism**: Fees are split between protocol and liquidity providers
+3. **Type Safety**: Phantom type parameters ensure type safety for trading pairs
+4. **Capability-based Admin**: Administrative functions require the AdminCap
+
+## Testing
+
+The contract includes comprehensive tests covering:
+
+1. Core functionality tests
+   - Pair creation
+   - Liquidity addition (proportional and unbalanced)
+   - Liquidity removal
+   - Token swaps (A→B and B→A)
+   - Fee collection
+
+2. Error condition tests
+   - Duplicate pair creation
+   - Invalid token order
+   - Slippage protection
+   - Invalid fee rate
+   - Insufficient liquidity
+
+3. Integration tests
+   - Complete trading cycle
+   - Multiple pairs interaction
+
+4. Mathematical verification tests
+   - Constant product invariant
+   - Price calculation accuracy
+
+## Usage Examples
 
 ### Creating a Trading Pair
 
-```typescript
-import { createTestnetDexSDK } from './scripts/dex-sdk';
-import { getSigner } from './scripts/helpers/getSigner';
+```move
+let registry = test_scenario::take_shared<PairRegistry>(scenario);
+let treasury_a = test_scenario::take_from_sender<TreasuryCap<TokenA>>(scenario);
+let treasury_b = test_scenario::take_from_sender<TreasuryCap<TokenB>>(scenario);
 
-const sdk = createTestnetDexSDK(DEX_CONFIG);
-const signer = getSigner({ secretKey: YOUR_PRIVATE_KEY });
+let coin_a = coin::mint(&mut treasury_a, 1000, test_scenario::ctx(scenario));
+let coin_b = coin::mint(&mut treasury_b, 2000, test_scenario::ctx(scenario));
 
-// Create USDC-USDT pair with 0.3% fee
-const result = await sdk.createPair(
-  signer,
-  "0x...::usdc::USDC",    // Token A type
-  "0x...::usdt::USDT",    // Token B type  
-  "1000000",              // Initial amount A (1 USDC)
-  "1000000",              // Initial amount B (1 USDT)
-  30,                     // 0.3% fee in basis points
-  coinAId,                // USDC coin object ID
-  coinBId                 // USDT coin object ID
+let lp_tokens = dex_core::create_pair(
+    &mut registry,
+    coin_a,
+    coin_b,
+    300, // 3% fee
+    test_scenario::ctx(scenario)
 );
 ```
 
 ### Adding Liquidity
 
-```typescript
-const result = await sdk.addLiquidity(
-  signer,
-  pairId,
-  "1000000",   // Amount A
-  "2000000",   // Amount B
-  "0",         // Minimum LP tokens (auto-calculated)
-  coinAId,     // Token A coin ID
-  coinBId,     // Token B coin ID
-  0.5          // 0.5% slippage tolerance
+```move
+let pair = test_scenario::take_shared<TradingPair<TokenA, TokenB>>(scenario);
+let coin_a = test_scenario::take_from_sender<Coin<TokenA>>(scenario);
+let coin_b = test_scenario::take_from_sender<Coin<TokenB>>(scenario);
+
+let (remaining_a, remaining_b, lp_tokens) = dex_core::add_liquidity(
+    &mut pair,
+    coin_a,
+    coin_b,
+    1, // Min liquidity
+    test_scenario::ctx(scenario)
 );
 ```
 
-### Token Swapping
+### Executing a Swap
 
-```typescript
-const result = await sdk.swap(
-  signer,
-  pairId,
-  "0x...::usdc::USDC",    // Input token type
-  "0x...::usdt::USDT",    // Output token type
-  "1000000",              // Input amount (1 USDC)
-  "990000",               // Minimum output (1% slippage)
-  coinInputId,            // Input coin ID
-  1.0                     // 1% slippage tolerance
+```move
+let pair = test_scenario::take_shared<TradingPair<TokenA, TokenB>>(scenario);
+let coin_a = test_scenario::take_from_sender<Coin<TokenA>>(scenario);
+
+let output_b = dex_core::swap_a_to_b(
+    &mut pair,
+    coin_a,
+    95, // Min amount out (slippage protection)
+    test_scenario::ctx(scenario)
 );
 ```
 
-### Getting Swap Quotes
+## Conclusion
 
-```typescript
-const quote = await sdk.getSwapQuote(
-  pairId,
-  "0x...::usdc::USDC",
-  "1000000",  // 1 USDC
-  0.5         // 0.5% slippage
-);
-
-console.log(`Expected output: ${quote.amountOut} USDT`);
-console.log(`Price impact: ${quote.priceImpact}%`);
-```
-
-## 🏗️ Architecture Overview
-
-### Smart Contract Architecture
-
-```
-┌─────────────────┐    ┌─────────────────┐
-│   dex_core      │    │   dex_utils     │
-│                 │    │                 │
-│ • TradingPair   │◄───┤ • SDK Wrappers  │
-│ • PairRegistry  │    │ • Auto Transfer │
-│ • Core Logic    │    │ • Batch Ops     │
-│ • Admin Funcs   │    │ • Multi-hop     │
-└─────────────────┘    └─────────────────┘
-         │
-         ▼
-┌─────────────────┐
-│   dex_tests     │
-│                 │
-│ • Unit Tests    │
-│ • Integration   │
-│ • Edge Cases    │
-│ • Math Verify   │
-└─────────────────┘
-```
-
-### Key Improvements Over Traditional AMMs
-
-1. **📦 Modular Design**: Core logic separated from utility functions
-2. **🧪 Comprehensive Testing**: Extensive test coverage including edge cases
-3. **🔒 Better Security**: Multiple validation layers and error handling
-4. **⚡ Gas Optimization**: Efficient algorithms and data structures
-5. **🛠️ Developer Experience**: Clean APIs and excellent documentation
-6. **🎯 Minimal Complexity**: Only essential features, avoiding feature bloat
-
-## 🧪 Testing
-
-The project includes comprehensive tests covering:
-
-- ✅ Core functionality (create, add/remove liquidity, swap)
-- ✅ Edge cases (zero amounts, large trades, minimum liquidity)
-- ✅ Error conditions (slippage, insufficient liquidity, invalid parameters)
-- ✅ Mathematical correctness (constant product formula, precision)
-- ✅ Integration scenarios (multi-hop swaps, batch operations)
-- ✅ Admin functions (fee updates, fee collection)
-
-Run tests with:
-```bash
-cd contracts
-sui move test
-```
-
-## 🔧 Configuration
-
-### Environment Variables
-
-Create a `.env` file:
-```env
-SUI_NETWORK=testnet
-PRIVATE_KEY=your_private_key_here
-ADMIN_PRIVATE_KEY=admin_private_key_here
-```
-
-### SDK Configuration
-
-```typescript
-const DEX_CONFIG = {
-  packageId: "0x...",     // Deployed package ID
-  registryId: "0x...",    // Registry object ID  
-  adminCapId: "0x...",    // Admin capability ID (optional)
-};
-```
-
-## 📊 Performance
-
-### Gas Costs (Testnet)
-- Create Pair: ~2M gas units
-- Add Liquidity: ~500K gas units
-- Swap: ~400K gas units
-- Remove Liquidity: ~450K gas units
-
-### Mathematical Precision
-- Uses u128 for intermediate calculations to prevent overflow
-- Implements proper rounding for LP token calculations
-- Maintains constant product invariant (x * y = k)
-
-## 🤝 Contributing
-
-We welcome contributions! Please follow these guidelines:
-
-1. **Code Style**: Follow existing patterns and naming conventions
-2. **Testing**: Add tests for any new functionality
-3. **Documentation**: Update documentation for API changes
-4. **Simplicity**: Keep additions minimal and focused
-
-## 📄 License
-
-This project is licensed under the MIT License. See LICENSE file for details.
-
-## 🆘 Support
-
-- 📚 [Sui Documentation](https://docs.sui.io/)
-- 💬 [Sui Discord](https://discord.gg/sui)
-- 🐛 [Report Issues](repository-issues-url)
-
-## 🔮 Roadmap
-
-- [ ] **V2 Features**: Concentrated liquidity, multiple fee tiers
-- [ ] **Analytics**: Historical data tracking and analytics
-- [ ] **Governance**: Token-based governance for protocol decisions  
-- [ ] **Cross-chain**: Bridge integration for multi-chain support
-- [ ] **Mobile SDK**: React Native SDK for mobile applications
-
----
-
-**Built with ❤️ for the Sui ecosystem**
+This DeFi scaffold provides a robust foundation for building decentralized exchange functionality on Sui Move. The implementation follows best practices for AMM design, including constant product formula, fee mechanisms, and comprehensive testing. 
